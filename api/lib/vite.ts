@@ -8,10 +8,11 @@ import { fileURLToPath } from "url";
 type App = Hono<{ Bindings: HttpBindings }>;
 
 export function serveStaticFiles(app: App) {
+  const __dirname = path.dirname(fileURLToPath(import.meta.url));
   // Try multiple paths for Railway compatibility
   const possiblePaths = [
-    path.resolve(import.meta.dirname, "../dist/public"),
-    path.resolve(import.meta.dirname, "../../dist/public"),
+    path.resolve(__dirname, "../dist/public"),
+    path.resolve(__dirname, "../../dist/public"),
     path.resolve(process.cwd(), "dist/public"),
     path.resolve("./dist/public"),
   ];
