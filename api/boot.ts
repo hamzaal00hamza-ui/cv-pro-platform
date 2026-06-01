@@ -8,6 +8,9 @@ import { env } from "./lib/env";
 
 const app = new Hono<{ Bindings: HttpBindings }>();
 
+// Health check endpoint for Railway
+app.get("/health", (c) => c.json({ status: "ok", env: env.isProduction ? "production" : "development" }));
+
 app.use(bodyLimit({ maxSize: 50 * 1024 * 1024 }));
 app.use("/api/trpc/*", async (c) => {
   return fetchRequestHandler({
@@ -28,6 +31,6 @@ if (env.isProduction) {
 
   const port = parseInt(process.env.PORT || "3000");
   serve({ fetch: app.fetch, port }, () => {
-    console.log(`Server running on http://localhost:${port}/`);
+    console.log(`Server running on port ${port}`);
   });
 }
