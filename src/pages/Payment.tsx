@@ -15,7 +15,49 @@ import {
   CheckCircle,
   AlertCircle,
   Info,
+  XCircle,
 } from "lucide-react";
+
+const APISYRIA_KEY = "a84b025e4b7e09ad38450aaa555ee83b0ae6ff8b17ec0d92e5a41e0f3ce39913";
+const STORE_PHONE = "0982493924";
+const AMOUNT = 5000;
+
+async function verifySyriatelPayment(
+  transactionCode: string,
+  senderPhone: string
+): Promise<{ success: boolean; message: string }> {
+  try {
+    const response = await fetch("https://apisyria.com/api/v1/syriatel-cash/verify", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "X-Api-Key": APISYRIA_KEY,
+      },
+      body: JSON.stringify({
+        transaction_id: transactionCode,
+        sender_phone: senderPhone,
+        receiver_phone: STORE_PHONE,
+        amount: AMOUNT,
+      }),
+    });
+
+    const data = await response.json();
+
+    if (response.ok && data.success) {
+      return { success: true, message: "تم التحقق من الدفع بنجاح" };
+    } else {
+      return {
+        success: false,
+        message: data.message || "فشل التحقق من عملية الدفع",
+      };
+    }
+  } catch (error) {
+    return {
+      success: false,
+      message: "تعذر الاتصال بخدمة التحقق، حاول مجدداً",
+    };
+  }
+}
 
 export default function Payment() {
   const navigate = useNavigate();
@@ -25,6 +67,7 @@ export default function Payment() {
   const [transactionCode, setTransactionCode] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [showSuccess, setShowSuccess] = useState(false);
+  const [verifyError, setVerifyError] = useState("");
   const [errors, setErrors] = useState<Record<string, string>>({});
 
   useEffect(() => {
@@ -47,14 +90,12 @@ export default function Payment() {
 
     if (!senderName.trim()) newErrors.senderName = "اسم المُرسل مطلوب";
 
-    // BUG FIX: phone number format validation
     if (!senderPhone.trim()) {
       newErrors.senderPhone = "رقم الهاتف المُرسل منه مطلوب";
     } else if (!/^09\d{8}$/.test(senderPhone.trim())) {
       newErrors.senderPhone = "رقم الهاتف يجب أن يبدأ بـ 09 ويتكون من 10 أرقام";
     }
 
-    // BUG FIX: transaction code validation — must not be empty or too short
     if (!transactionCode.trim()) {
       newErrors.transactionCode = "رقم العملية مطلوب";
     } else if (transactionCode.trim().length < 4) {
@@ -68,20 +109,31 @@ export default function Payment() {
   const handlePayment = async () => {
     if (!validate()) return;
     setIsSubmitting(true);
+    setVerifyError("");
 
-    // Simulate payment verification delay
-    await new Promise((resolve) => setTimeout(resolve, 2000));
+    // التحقق التلقائي من سيرياتيل كاش
+    const result = await verifySyriatelPayment(
+      transactionCode.trim(),
+      senderPhone.trim()
+    );
 
-    // BUG FIX: store all payment info including timestamp for audit
+    if (!result.success) {
+      setVerifyError(result.message);
+      setIsSubmitting(false);
+      return;
+    }
+
+    // تم التحقق بنجاح — حفظ بيانات الدفع
     localStorage.setItem(
       "payment_info",
       JSON.stringify({
         senderPhone: senderPhone.trim(),
         senderName: senderName.trim(),
         transactionCode: transactionCode.trim(),
-        amount: 5000,
+        amount: AMOUNT,
         currency: "SYP",
         method: "syriatel_cash",
+        verified: true,
         date: new Date().toISOString(),
       })
     );
@@ -109,9 +161,9 @@ export default function Payment() {
           <div className="w-20 h-20 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-6">
             <CheckCircle className="w-12 h-12 text-green-600" />
           </div>
-          <h1 className="text-2xl font-bold mb-2">تم استلام طلبك!</h1>
+          <h1 className="text-2xl font-bold mb-2">تم التحقق من الدفع بنجاح!</h1>
           <p className="text-muted-foreground mb-4">
-            سيتم التحقق من عملية الدفع وإرسال السيرة الذاتية لك
+            تم التحقق التلقائي من عملية سيرياتيل كاش
           </p>
           <p className="text-sm text-muted-foreground">
             جاري تحويلك لصفحة معاينة السيرة الذاتية...
@@ -203,6 +255,14 @@ export default function Payment() {
                   تأكيد عملية الدفع
                 </h2>
 
+                {/* خطأ التحقق */}
+                {verifyError && (
+                  <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-lg flex items-center gap-2 text-red-700">
+                    <XCircle className="w-4 h-4 shrink-0" />
+                    <p className="text-sm">{verifyError}</p>
+                  </div>
+                )}
+
                 <div className="space-y-4">
                   <div className="space-y-2">
                     <Label htmlFor="senderName">اسم المُرسل *</Label>
@@ -261,12 +321,12 @@ export default function Payment() {
                     {isSubmitting ? (
                       <>
                         <Loader2 className="w-5 h-5 animate-spin ml-2" />
-                        جاري التحقق...
+                        جاري التحقق التلقائي...
                       </>
                     ) : (
                       <>
                         <Smartphone className="w-5 h-5 ml-2" />
-                        تأكيد الدفع
+                        تحقق وتأكيد الدفع
                       </>
                     )}
                   </Button>
@@ -309,10 +369,9 @@ export default function Payment() {
 
                 <div className="flex items-center gap-2 text-xs text-muted-foreground bg-muted p-3 rounded-lg">
                   <Shield className="w-4 h-4 text-green-600 shrink-0" />
-                  <span>الدفع آمن عبر سيرياتيل كاش</span>
+                  <span>تحقق تلقائي فوري عبر سيرياتيل كاش</span>
                 </div>
 
-                {/* BUG FIX: using actual store number from env */}
                 <div className="mt-4 p-3 bg-[#1a5fb4]/5 rounded-lg border border-[#1a5fb4]/20">
                   <div className="flex items-center gap-2 text-sm">
                     <Smartphone className="w-4 h-4 text-[#1a5fb4]" />
