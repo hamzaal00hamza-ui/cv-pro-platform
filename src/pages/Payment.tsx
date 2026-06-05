@@ -18,21 +18,18 @@ import {
   XCircle,
 } from "lucide-react";
 
-const APISYRIA_KEY = "a84b025e4b7e09ad38450aaa555ee83b0ae6ff8b17ec0d92e5a41e0f3ce39913";
 const STORE_PHONE = "0982493924";
 const AMOUNT = 5000;
 
+// نمرر الطلب عبر السيرفر لتجنب مشكلة CORS
 async function verifySyriatelPayment(
   transactionCode: string,
   senderPhone: string
 ): Promise<{ success: boolean; message: string }> {
   try {
-    const response = await fetch("https://apisyria.com/api/v1/syriatel-cash/verify", {
+    const response = await fetch("/api/verify-payment", {
       method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "X-Api-Key": APISYRIA_KEY,
-      },
+      headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         transaction_id: transactionCode,
         sender_phone: senderPhone,
@@ -48,13 +45,13 @@ async function verifySyriatelPayment(
     } else {
       return {
         success: false,
-        message: data.message || "فشل التحقق من عملية الدفع",
+        message: data.message || "فشل التحقق — تأكد من رقم العملية ورقم هاتفك",
       };
     }
   } catch (error) {
     return {
       success: false,
-      message: "تعذر الاتصال بخدمة التحقق، حاول مجدداً",
+      message: "تعذر الاتصال بالسيرفر، حاول مجدداً",
     };
   }
 }
