@@ -34,15 +34,20 @@ export default function Home() {
           <p className="text-lg text-muted-foreground max-w-2xl mx-auto mb-10 leading-relaxed">
             صمم سيرتك الذاتية بأحدث القوالب الاحترافية خلال دقائق. احصل على سيرة ذاتية مميزة تلفت انتباه أصحاب العمل.
           </p>
-          <div className="flex flex-col sm:flex-row items-center justify-center gap-4 mb-12">
+          <div className="flex flex-col sm:flex-row items-center justify-center gap-3 mb-12">
             <Link to="/create-cv">
-              <Button className="bg-gradient-to-r from-[#1a5fb4] to-[#3b82f6] hover:from-[#164ea3] hover:to-[#2563eb] text-white font-bold px-8 py-6 text-lg rounded-xl shadow-lg shadow-[#1a5fb4]/25 hover:-translate-y-1 transition-all">
-                ابدأ الآن<ChevronLeft className="w-5 h-5 mr-2" />
+              <Button className="bg-gradient-to-r from-[#1a5fb4] to-[#3b82f6] hover:from-[#164ea3] hover:to-[#2563eb] text-white font-bold px-8 py-6 text-lg rounded-xl shadow-lg shadow-[#1a5fb4]/25 hover:-translate-y-1 transition-all w-full sm:w-auto">
+                ابدأ الآن <ChevronLeft className="w-5 h-5 mr-2" />
               </Button>
             </Link>
-            <a href="https://wa.me/963982493924" target="_blank" rel="noopener noreferrer">
-              <Button variant="outline" className="gap-2 px-6 py-6 rounded-xl border-green-400 text-green-700 hover:bg-green-50">
-                <MessageCircle className="w-5 h-5" />تواصل عبر واتساب
+            <a href="/payment" className="w-full sm:w-auto">
+              <Button className="bg-gradient-to-r from-[#16a34a] to-[#22c55e] hover:from-[#15803d] hover:to-[#16a34a] text-white font-bold px-8 py-6 text-lg rounded-xl shadow-lg w-full gap-2">
+                💳 إيداع وشراء
+              </Button>
+            </a>
+            <a href="https://wa.me/963982493924" target="_blank" rel="noopener noreferrer" className="w-full sm:w-auto">
+              <Button variant="outline" className="px-6 py-6 rounded-xl border-2 border-green-500 text-green-700 hover:bg-green-50 font-bold w-full gap-2">
+                💬 واتساب
               </Button>
             </a>
           </div>
