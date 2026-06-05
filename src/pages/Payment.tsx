@@ -24,7 +24,7 @@ const AMOUNT = 5000;
 // نمرر الطلب عبر السيرفر لتجنب مشكلة CORS
 async function verifySyriatelPayment(
   transactionCode: string,
-  senderPhone: string
+  sentAmount: string
 ): Promise<{ success: boolean; message: string }> {
   try {
     const response = await fetch("/api/verify-payment", {
@@ -32,7 +32,7 @@ async function verifySyriatelPayment(
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         transaction_id: transactionCode,
-        sender_phone: senderPhone,
+        sent_amount: sentAmount,
         receiver_phone: STORE_PHONE,
         amount: AMOUNT,
       }),
@@ -59,7 +59,7 @@ async function verifySyriatelPayment(
 export default function Payment() {
   const navigate = useNavigate();
   const [cvData, setCvData] = useState<CVData | null>(null);
-  const [senderPhone, setSenderPhone] = useState("");
+  const [sentAmount, setSentAmount] = useState("");
   const [senderName, setSenderName] = useState("");
   const [transactionCode, setTransactionCode] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -87,10 +87,10 @@ export default function Payment() {
 
     if (!senderName.trim()) newErrors.senderName = "اسم المُرسل مطلوب";
 
-    if (!senderPhone.trim()) {
-      newErrors.senderPhone = "رقم الهاتف المُرسل منه مطلوب";
-    } else if (!/^09\d{8}$/.test(senderPhone.trim())) {
-      newErrors.senderPhone = "رقم الهاتف يجب أن يبدأ بـ 09 ويتكون من 10 أرقام";
+    if (!sentAmount.trim()) {
+      newErrors.sentAmount = "المبلغ الذي تم إرساله مطلوب";
+    } else if (parseInt(sentAmount.trim()) < AMOUNT) {
+      newErrors.sentAmount = `المبلغ يجب أن يكون ${AMOUNT.toLocaleString()} ل.س على الأقل`;
     }
 
     if (!transactionCode.trim()) {
@@ -111,7 +111,7 @@ export default function Payment() {
     // التحقق التلقائي من سيرياتيل كاش
     const result = await verifySyriatelPayment(
       transactionCode.trim(),
-      senderPhone.trim()
+      sentAmount.trim()
     );
 
     if (!result.success) {
@@ -124,7 +124,7 @@ export default function Payment() {
     localStorage.setItem(
       "payment_info",
       JSON.stringify({
-        senderPhone: senderPhone.trim(),
+        sentAmount: sentAmount.trim(),
         senderName: senderName.trim(),
         transactionCode: transactionCode.trim(),
         amount: AMOUNT,
@@ -276,18 +276,18 @@ export default function Payment() {
                   </div>
 
                   <div className="space-y-2">
-                    <Label htmlFor="senderPhone">رقم الهاتف المُرسل منه *</Label>
+                    <Label htmlFor="sentAmount">المبلغ الذي تم إرساله (ل.س) *</Label>
                     <Input
-                      id="senderPhone"
-                      value={senderPhone}
-                      onChange={(e) => setSenderPhone(e.target.value)}
-                      placeholder="0987654321"
+                      id="sentAmount"
+                      value={sentAmount}
+                      onChange={(e) => setSentAmount(e.target.value)}
+                      placeholder="5000"
                       dir="ltr"
-                      maxLength={10}
-                      className={errors.senderPhone ? "border-red-500" : ""}
+                      type="number"
+                      className={errors.sentAmount ? "border-red-500" : ""}
                     />
-                    {errors.senderPhone && (
-                      <p className="text-red-500 text-xs">{errors.senderPhone}</p>
+                    {errors.sentAmount && (
+                      <p className="text-red-500 text-xs">{errors.sentAmount}</p>
                     )}
                   </div>
 
