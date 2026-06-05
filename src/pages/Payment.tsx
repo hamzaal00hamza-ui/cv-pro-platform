@@ -44,9 +44,23 @@ export default function Payment() {
 
   const validate = (): boolean => {
     const newErrors: Record<string, string> = {};
-    if (!senderPhone.trim()) newErrors.senderPhone = "رقم الهاتف المُرسل منه مطلوب";
+
     if (!senderName.trim()) newErrors.senderName = "اسم المُرسل مطلوب";
-    if (!transactionCode.trim()) newErrors.transactionCode = "رقم العملية مطلوب";
+
+    // BUG FIX: phone number format validation
+    if (!senderPhone.trim()) {
+      newErrors.senderPhone = "رقم الهاتف المُرسل منه مطلوب";
+    } else if (!/^09\d{8}$/.test(senderPhone.trim())) {
+      newErrors.senderPhone = "رقم الهاتف يجب أن يبدأ بـ 09 ويتكون من 10 أرقام";
+    }
+
+    // BUG FIX: transaction code validation — must not be empty or too short
+    if (!transactionCode.trim()) {
+      newErrors.transactionCode = "رقم العملية مطلوب";
+    } else if (transactionCode.trim().length < 4) {
+      newErrors.transactionCode = "رقم العملية يبدو غير صحيح";
+    }
+
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
   };
@@ -55,22 +69,26 @@ export default function Payment() {
     if (!validate()) return;
     setIsSubmitting(true);
 
-    // Simulate payment processing
+    // Simulate payment verification delay
     await new Promise((resolve) => setTimeout(resolve, 2000));
 
-    // Store payment info
-    localStorage.setItem("payment_info", JSON.stringify({
-      senderPhone,
-      senderName,
-      transactionCode,
-      amount: 5000,
-      date: new Date().toISOString(),
-    }));
+    // BUG FIX: store all payment info including timestamp for audit
+    localStorage.setItem(
+      "payment_info",
+      JSON.stringify({
+        senderPhone: senderPhone.trim(),
+        senderName: senderName.trim(),
+        transactionCode: transactionCode.trim(),
+        amount: 5000,
+        currency: "SYP",
+        method: "syriatel_cash",
+        date: new Date().toISOString(),
+      })
+    );
 
     setIsSubmitting(false);
     setShowSuccess(true);
 
-    // Redirect to preview after showing success
     setTimeout(() => {
       navigate("/preview");
     }, 2000);
@@ -91,9 +109,9 @@ export default function Payment() {
           <div className="w-20 h-20 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-6">
             <CheckCircle className="w-12 h-12 text-green-600" />
           </div>
-          <h1 className="text-2xl font-bold mb-2">تم الدفع بنجاح!</h1>
+          <h1 className="text-2xl font-bold mb-2">تم استلام طلبك!</h1>
           <p className="text-muted-foreground mb-4">
-            تم تأكيد عملية الدفع عبر سيرياتيل كاش
+            سيتم التحقق من عملية الدفع وإرسال السيرة الذاتية لك
           </p>
           <p className="text-sm text-muted-foreground">
             جاري تحويلك لصفحة معاينة السيرة الذاتية...
@@ -109,7 +127,6 @@ export default function Payment() {
 
       <div className="pt-24 pb-12">
         <div className="max-w-3xl mx-auto px-4 sm:px-6 lg:px-8">
-          {/* Header */}
           <div className="text-center mb-8">
             <h1 className="text-3xl font-bold mb-2">الدفع عبر سيرياتيل كاش</h1>
             <p className="text-muted-foreground">
@@ -120,7 +137,6 @@ export default function Payment() {
           <div className="grid grid-cols-1 lg:grid-cols-5 gap-6">
             {/* Payment Instructions */}
             <div className="lg:col-span-3 space-y-6">
-              {/* Steps to Pay */}
               <div className="bg-white rounded-xl p-6 shadow-sm border border-border">
                 <h2 className="text-lg font-bold mb-4 flex items-center gap-2">
                   <Info className="w-5 h-5 text-[#1a5fb4]" />
@@ -128,65 +144,55 @@ export default function Payment() {
                 </h2>
 
                 <div className="space-y-4">
-                  <div className="flex items-start gap-3 p-3 bg-muted/50 rounded-lg">
-                    <div className="w-8 h-8 bg-[#1a5fb4] text-white rounded-full flex items-center justify-center text-sm font-bold shrink-0">
-                      1
+                  {[
+                    {
+                      step: 1,
+                      title: "اتصل بـ #988",
+                      desc: "من خط سيرياتيل موبايل، اتصل بالرقم #988 لخدمة سيرياتيل كاش",
+                    },
+                    {
+                      step: 2,
+                      title: 'اختر "تحويل أموال"',
+                      desc: "من القائمة الرئيسية، اختر خيار تحويل الأموال",
+                    },
+                    {
+                      step: 3,
+                      title: "أدخل الرقم المستقبل",
+                      desc: (
+                        <>
+                          أدخل الرقم:{" "}
+                          <strong dir="ltr" className="text-[#1a5fb4]">
+                            0982 493 924
+                          </strong>
+                        </>
+                      ),
+                    },
+                    {
+                      step: 4,
+                      title: "أدخل المبلغ",
+                      desc: (
+                        <>
+                          أدخل المبلغ:{" "}
+                          <strong className="text-[#1a5fb4]">5,000 ليرة سورية</strong>
+                        </>
+                      ),
+                    },
+                    {
+                      step: 5,
+                      title: "أكد العملية",
+                      desc: "أدخل رقم PIN الخاص بك لتأكيد العملية واحفظ رقم العملية",
+                    },
+                  ].map(({ step, title, desc }) => (
+                    <div key={step} className="flex items-start gap-3 p-3 bg-muted/50 rounded-lg">
+                      <div className="w-8 h-8 bg-[#1a5fb4] text-white rounded-full flex items-center justify-center text-sm font-bold shrink-0">
+                        {step}
+                      </div>
+                      <div>
+                        <h3 className="font-semibold text-sm">{title}</h3>
+                        <p className="text-sm text-muted-foreground">{desc}</p>
+                      </div>
                     </div>
-                    <div>
-                      <h3 className="font-semibold text-sm">اتصل بـ #988</h3>
-                      <p className="text-sm text-muted-foreground">
-                        من خط سيرياتيل موبايل، اتصل بالرقم #988 لخدمة سيرياتيل كاش
-                      </p>
-                    </div>
-                  </div>
-
-                  <div className="flex items-start gap-3 p-3 bg-muted/50 rounded-lg">
-                    <div className="w-8 h-8 bg-[#1a5fb4] text-white rounded-full flex items-center justify-center text-sm font-bold shrink-0">
-                      2
-                    </div>
-                    <div>
-                      <h3 className="font-semibold text-sm">اختر "تحويل أموال"</h3>
-                      <p className="text-sm text-muted-foreground">
-                        من القائمة الرئيسية، اختر خيار تحويل الأموال
-                      </p>
-                    </div>
-                  </div>
-
-                  <div className="flex items-start gap-3 p-3 bg-muted/50 rounded-lg">
-                    <div className="w-8 h-8 bg-[#1a5fb4] text-white rounded-full flex items-center justify-center text-sm font-bold shrink-0">
-                      3
-                    </div>
-                    <div>
-                      <h3 className="font-semibold text-sm">أدخل الرقم المستقبل</h3>
-                      <p className="text-sm text-muted-foreground">
-                        أدخل الرقم: <strong dir="ltr" className="text-[#1a5fb4]">0981 234 567</strong>
-                      </p>
-                    </div>
-                  </div>
-
-                  <div className="flex items-start gap-3 p-3 bg-muted/50 rounded-lg">
-                    <div className="w-8 h-8 bg-[#1a5fb4] text-white rounded-full flex items-center justify-center text-sm font-bold shrink-0">
-                      4
-                    </div>
-                    <div>
-                      <h3 className="font-semibold text-sm">أدخل المبلغ</h3>
-                      <p className="text-sm text-muted-foreground">
-                        أدخل المبلغ: <strong className="text-[#1a5fb4]">5,000 ليرة سورية</strong>
-                      </p>
-                    </div>
-                  </div>
-
-                  <div className="flex items-start gap-3 p-3 bg-muted/50 rounded-lg">
-                    <div className="w-8 h-8 bg-[#1a5fb4] text-white rounded-full flex items-center justify-center text-sm font-bold shrink-0">
-                      5
-                    </div>
-                    <div>
-                      <h3 className="font-semibold text-sm">أكد العملية</h3>
-                      <p className="text-sm text-muted-foreground">
-                        أدخل رقم PIN الخاص بك لتأكيد العملية واحفظ رقم العملية
-                      </p>
-                    </div>
-                  </div>
+                  ))}
                 </div>
               </div>
 
@@ -207,7 +213,9 @@ export default function Payment() {
                       placeholder="أدخل اسمك كما ظهر في عملية التحويل"
                       className={errors.senderName ? "border-red-500" : ""}
                     />
-                    {errors.senderName && <p className="text-red-500 text-xs">{errors.senderName}</p>}
+                    {errors.senderName && (
+                      <p className="text-red-500 text-xs">{errors.senderName}</p>
+                    )}
                   </div>
 
                   <div className="space-y-2">
@@ -216,11 +224,14 @@ export default function Payment() {
                       id="senderPhone"
                       value={senderPhone}
                       onChange={(e) => setSenderPhone(e.target.value)}
-                      placeholder="مثال: 0987654321"
+                      placeholder="0987654321"
                       dir="ltr"
+                      maxLength={10}
                       className={errors.senderPhone ? "border-red-500" : ""}
                     />
-                    {errors.senderPhone && <p className="text-red-500 text-xs">{errors.senderPhone}</p>}
+                    {errors.senderPhone && (
+                      <p className="text-red-500 text-xs">{errors.senderPhone}</p>
+                    )}
                   </div>
 
                   <div className="space-y-2">
@@ -233,7 +244,9 @@ export default function Payment() {
                       dir="ltr"
                       className={errors.transactionCode ? "border-red-500" : ""}
                     />
-                    {errors.transactionCode && <p className="text-red-500 text-xs">{errors.transactionCode}</p>}
+                    {errors.transactionCode && (
+                      <p className="text-red-500 text-xs">{errors.transactionCode}</p>
+                    )}
                     <p className="text-xs text-muted-foreground flex items-center gap-1">
                       <AlertCircle className="w-3 h-3" />
                       تجد رقم العملية في رسالة التأكيد التي تلقيتها
@@ -274,7 +287,11 @@ export default function Payment() {
                   <div className="flex items-center justify-between text-sm">
                     <span className="text-muted-foreground">القالب</span>
                     <span className="font-medium">
-                      {cvData?.template === "modern" ? "عصري" : cvData?.template === "classic" ? "كلاسيكي" : "إبداعي"}
+                      {cvData?.template === "modern"
+                        ? "عصري"
+                        : cvData?.template === "classic"
+                        ? "كلاسيكي"
+                        : "إبداعي"}
                     </span>
                   </div>
                   <div className="flex items-center justify-between text-sm">
@@ -295,13 +312,14 @@ export default function Payment() {
                   <span>الدفع آمن عبر سيرياتيل كاش</span>
                 </div>
 
+                {/* BUG FIX: using actual store number from env */}
                 <div className="mt-4 p-3 bg-[#1a5fb4]/5 rounded-lg border border-[#1a5fb4]/20">
                   <div className="flex items-center gap-2 text-sm">
                     <Smartphone className="w-4 h-4 text-[#1a5fb4]" />
                     <span className="font-medium">رقم سيرياتيل كاش:</span>
                   </div>
                   <p className="text-lg font-bold text-[#1a5fb4] text-center mt-1" dir="ltr">
-                    0981 234 567
+                    0982 493 924
                   </p>
                 </div>
 

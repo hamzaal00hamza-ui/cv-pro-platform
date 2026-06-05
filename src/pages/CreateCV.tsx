@@ -1,4 +1,4 @@
-import { useState, useRef, useCallback } from "react";
+import { useState, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -7,7 +7,6 @@ import { Label } from "@/components/ui/label";
 import Navbar from "@/components/Navbar";
 import Footer from "@/components/Footer";
 import { CVData, CV_TEMPLATES } from "@/types/cv";
-import { trpc } from "@/providers/trpc";
 import {
   ChevronLeft,
   ChevronRight,
@@ -54,8 +53,7 @@ export default function CreateCV() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [errors, setErrors] = useState<Record<string, string>>({});
 
-  const createUser = trpc.user.create.useMutation();
-  const createCV = trpc.cv.create.useMutation();
+  // BUG FIX: removed unused trpc imports (createUser, createCV not needed here)
 
   const updatePersonalInfo = useCallback((field: string, value: string) => {
     setData((prev) => ({
@@ -152,6 +150,9 @@ export default function CreateCV() {
     if (step === 0) {
       if (!data.personalInfo.fullName.trim()) newErrors.fullName = "الاسم الكامل مطلوب";
       if (!data.personalInfo.email.trim()) newErrors.email = "البريد الإلكتروني مطلوب";
+      // BUG FIX: added basic email format validation
+      else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(data.personalInfo.email))
+        newErrors.email = "صيغة البريد الإلكتروني غير صحيحة";
       if (!data.personalInfo.phone.trim()) newErrors.phone = "رقم الهاتف مطلوب";
     }
 
@@ -167,6 +168,7 @@ export default function CreateCV() {
 
   const handleNext = () => {
     if (validateStep()) {
+      setErrors({});
       setStep((prev) => Math.min(prev + 1, STEPS.length - 1));
     }
   };
@@ -179,9 +181,7 @@ export default function CreateCV() {
   const handleSubmit = async () => {
     if (!validateStep()) return;
     setIsSubmitting(true);
-
     try {
-      // Store CV data in localStorage for payment page
       localStorage.setItem("cv_data", JSON.stringify(data));
       navigate("/payment");
     } catch (error) {
@@ -197,7 +197,6 @@ export default function CreateCV() {
 
       <div className="pt-24 pb-12">
         <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
-          {/* Header */}
           <div className="text-center mb-8">
             <h1 className="text-3xl font-bold mb-2">إنشاء السيرة الذاتية</h1>
             <p className="text-muted-foreground">
@@ -205,16 +204,23 @@ export default function CreateCV() {
             </p>
           </div>
 
-          {/* Steps Progress */}
+          {/* BUG FIX: Steps Progress — fixed with relative wrapper so connector lines work */}
           <div className="bg-white rounded-xl p-4 mb-8 shadow-sm border border-border">
-            <div className="flex items-center justify-between">
+            <div className="relative flex items-center justify-between">
+              {/* Connector line behind circles */}
+              <div className="absolute top-5 right-5 left-5 h-0.5 bg-muted -z-0" />
+              <div
+                className="absolute top-5 right-5 h-0.5 bg-[#1a5fb4] transition-all duration-500 -z-0"
+                style={{ width: `calc(${(step / (STEPS.length - 1)) * 100}% - 1.25rem)` }}
+              />
+
               {STEPS.map((s, i) => {
                 const Icon = s.icon;
                 const isActive = i === step;
                 const isCompleted = i < step;
 
                 return (
-                  <div key={s.id} className="flex flex-col items-center gap-2 flex-1">
+                  <div key={s.id} className="flex flex-col items-center gap-2 relative z-10">
                     <div
                       className={`w-10 h-10 rounded-full flex items-center justify-center transition-all ${
                         isActive
@@ -226,17 +232,13 @@ export default function CreateCV() {
                     >
                       {isCompleted ? <CheckCircle className="w-5 h-5" /> : <Icon className="w-5 h-5" />}
                     </div>
-                    <span className={`text-xs hidden sm:block ${isActive ? "font-bold text-[#1a5fb4]" : "text-muted-foreground"}`}>
+                    <span
+                      className={`text-xs hidden sm:block ${
+                        isActive ? "font-bold text-[#1a5fb4]" : "text-muted-foreground"
+                      }`}
+                    >
                       {s.label}
                     </span>
-                    {i < STEPS.length - 1 && (
-                      <div
-                        className={`hidden sm:block absolute h-0.5 w-full top-5 left-1/2 -z-10 ${
-                          isCompleted ? "bg-[#1a5fb4]" : "bg-muted"
-                        }`}
-                        style={{ width: "calc(100% - 2.5rem)", transform: "translateX(50%)" }}
-                      />
-                    )}
                   </div>
                 );
               })}
@@ -345,7 +347,11 @@ export default function CreateCV() {
                           value={edu.institution}
                           onChange={(e) => updateEducation(index, "institution", e.target.value)}
                           placeholder="جامعة دمشق"
+                          className={errors[`edu_${index}_inst`] ? "border-red-500" : ""}
                         />
+                        {errors[`edu_${index}_inst`] && (
+                          <p className="text-red-500 text-xs">{errors[`edu_${index}_inst`]}</p>
+                        )}
                       </div>
                       <div className="space-y-2">
                         <Label>الشهادة</Label>
@@ -520,7 +526,7 @@ export default function CreateCV() {
                     <select
                       value={lang.level}
                       onChange={(e) => updateLanguage(index, "level", e.target.value)}
-                      className="border border-input rounded-md px-3 py-2 text-sm"
+                      className="border border-input rounded-md px-3 py-2 text-sm bg-background"
                     >
                       <option value="مبتدئ">مبتدئ</option>
                       <option value="متوسط">متوسط</option>

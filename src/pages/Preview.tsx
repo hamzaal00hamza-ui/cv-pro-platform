@@ -4,7 +4,6 @@ import { Button } from "@/components/ui/button";
 import Navbar from "@/components/Navbar";
 import Footer from "@/components/Footer";
 import { CVData } from "@/types/cv";
-import { trpc } from "@/providers/trpc";
 import {
   Download,
   Loader2,
@@ -27,12 +26,8 @@ export default function Preview() {
   const navigate = useNavigate();
   const cvRef = useRef<HTMLDivElement>(null);
   const [cvData, setCvData] = useState<CVData | null>(null);
-  const [paymentInfo, setPaymentInfo] = useState<any>(null);
   const [isDownloading, setIsDownloading] = useState(false);
-  const [savedToDB, setSavedToDB] = useState(false);
-
-  const createUser = trpc.user.create.useMutation();
-  const createCV = trpc.cv.create.useMutation();
+  const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
     const storedCV = localStorage.getItem("cv_data");
@@ -45,45 +40,15 @@ export default function Preview() {
 
     try {
       const parsedCV = JSON.parse(storedCV) as CVData;
-      const parsedPayment = JSON.parse(storedPayment);
       setCvData(parsedCV);
-      setPaymentInfo(parsedPayment);
-
-      // Save to database
-      saveToDatabase(parsedCV, parsedPayment);
     } catch {
       navigate("/create-cv");
+      return;
     }
+    setIsLoading(false);
   }, [navigate]);
 
-  const saveToDatabase = async (cv: CVData, payment: any) => {
-    try {
-      const userResult = await createUser.mutateAsync({
-        fullName: cv.personalInfo.fullName,
-        email: cv.personalInfo.email,
-        phone: cv.personalInfo.phone,
-      });
-
-      const cvResult = await createCV.mutateAsync({
-        userId: userResult.id,
-        template: cv.template,
-        personalInfo: cv.personalInfo,
-        education: cv.education,
-        experience: cv.experience,
-        skills: cv.skills,
-        languages: cv.languages,
-      });
-
-      // Store CV ID for reference
-      localStorage.setItem("cv_id", cvResult.id.toString());
-      setSavedToDB(true);
-    } catch (error) {
-      console.error("Error saving to DB:", error);
-      // Continue even if DB save fails - user already paid
-      setSavedToDB(true);
-    }
-  };
-
+  // BUG FIX: PDF generation ratio calculation fixed
   const downloadPDF = async () => {
     if (!cvRef.current) return;
     setIsDownloading(true);
@@ -96,17 +61,21 @@ export default function Preview() {
         backgroundColor: "#ffffff",
       });
 
-      const imgData = canvas.toDataURL("image/png");
       const pdf = new jsPDF("p", "mm", "a4");
       const pdfWidth = pdf.internal.pageSize.getWidth();
       const pdfHeight = pdf.internal.pageSize.getHeight();
-      const imgWidth = canvas.width;
-      const imgHeight = canvas.height;
-      const ratio = Math.min(pdfWidth / imgWidth, pdfHeight / imgHeight);
-      const imgX = (pdfWidth - imgWidth * ratio) / 2;
-      const imgY = 0;
 
-      pdf.addImage(imgData, "PNG", imgX, imgY, imgWidth * ratio, imgHeight * ratio);
+      // FIX: correct ratio using mm dimensions, not pixel dimensions
+      const canvasWidthMM = (canvas.width * 25.4) / (96 * 2); // 96dpi * scale=2
+      const canvasHeightMM = (canvas.height * 25.4) / (96 * 2);
+
+      const ratio = Math.min(pdfWidth / canvasWidthMM, pdfHeight / canvasHeightMM);
+      const finalWidth = canvasWidthMM * ratio;
+      const finalHeight = canvasHeightMM * ratio;
+      const offsetX = (pdfWidth - finalWidth) / 2;
+
+      const imgData = canvas.toDataURL("image/png");
+      pdf.addImage(imgData, "PNG", offsetX, 0, finalWidth, finalHeight);
       pdf.save(`CV_${cvData?.personalInfo.fullName || "resume"}.pdf`);
     } catch (error) {
       console.error("Error generating PDF:", error);
@@ -119,7 +88,8 @@ export default function Preview() {
     window.print();
   };
 
-  if (!cvData || !savedToDB) {
+  // BUG FIX: removed dependency on savedToDB — page shows as soon as data loads
+  if (isLoading) {
     return (
       <div className="min-h-screen flex items-center justify-center" dir="rtl">
         <div className="text-center">
@@ -129,6 +99,8 @@ export default function Preview() {
       </div>
     );
   }
+
+  if (!cvData) return null;
 
   return (
     <div className="min-h-screen bg-background" dir="rtl">
@@ -162,11 +134,7 @@ export default function Preview() {
               تحميل PDF
             </Button>
 
-            <Button
-              variant="outline"
-              onClick={handlePrint}
-              className="gap-2"
-            >
+            <Button variant="outline" onClick={handlePrint} className="gap-2">
               <Printer className="w-4 h-4" />
               طباعة
             </Button>
@@ -205,7 +173,6 @@ export default function Preview() {
 function ModernTemplate({ data }: { data: CVData }) {
   return (
     <div className="bg-white">
-      {/* Header */}
       <div className="bg-gradient-to-r from-[#1a5fb4] to-[#3b82f6] text-white p-8">
         <h1 className="text-3xl font-bold mb-2">{data.personalInfo.fullName}</h1>
         <div className="flex flex-wrap gap-4 text-sm text-white/90">
@@ -231,7 +198,6 @@ function ModernTemplate({ data }: { data: CVData }) {
       </div>
 
       <div className="p-8">
-        {/* Summary */}
         {data.personalInfo.summary && (
           <div className="mb-6">
             <h2 className="text-lg font-bold text-[#1a5fb4] border-b-2 border-[#1a5fb4] pb-1 mb-3 flex items-center gap-2">
@@ -242,7 +208,6 @@ function ModernTemplate({ data }: { data: CVData }) {
           </div>
         )}
 
-        {/* Education */}
         {data.education.length > 0 && data.education[0].institution && (
           <div className="mb-6">
             <h2 className="text-lg font-bold text-[#1a5fb4] border-b-2 border-[#1a5fb4] pb-1 mb-3 flex items-center gap-2">
@@ -252,9 +217,11 @@ function ModernTemplate({ data }: { data: CVData }) {
             {data.education.map((edu, i) => (
               <div key={i} className="mb-3">
                 <div className="flex items-center justify-between">
-                  <h3 className="font-bold text-gray-800">{edu.degree} - {edu.fieldOfStudy}</h3>
+                  <h3 className="font-bold text-gray-800">
+                    {edu.degree} {edu.fieldOfStudy ? `- ${edu.fieldOfStudy}` : ""}
+                  </h3>
                   <span className="text-xs text-gray-500">
-                    {edu.startDate} - {edu.endDate}
+                    {edu.startDate} {edu.endDate ? `- ${edu.endDate}` : ""}
                   </span>
                 </div>
                 <p className="text-sm text-gray-600">{edu.institution}</p>
@@ -263,7 +230,6 @@ function ModernTemplate({ data }: { data: CVData }) {
           </div>
         )}
 
-        {/* Experience */}
         {data.experience.length > 0 && data.experience[0].company && (
           <div className="mb-6">
             <h2 className="text-lg font-bold text-[#1a5fb4] border-b-2 border-[#1a5fb4] pb-1 mb-3 flex items-center gap-2">
@@ -275,17 +241,16 @@ function ModernTemplate({ data }: { data: CVData }) {
                 <div className="flex items-center justify-between">
                   <h3 className="font-bold text-gray-800">{exp.position}</h3>
                   <span className="text-xs text-gray-500">
-                    {exp.startDate} - {exp.endDate}
+                    {exp.startDate} {exp.endDate ? `- ${exp.endDate}` : ""}
                   </span>
                 </div>
                 <p className="text-sm text-gray-600 font-medium">{exp.company}</p>
-                <p className="text-sm text-gray-700 mt-1">{exp.description}</p>
+                {exp.description && <p className="text-sm text-gray-700 mt-1">{exp.description}</p>}
               </div>
             ))}
           </div>
         )}
 
-        {/* Skills */}
         {data.skills.length > 0 && data.skills[0] && (
           <div className="mb-6">
             <h2 className="text-lg font-bold text-[#1a5fb4] border-b-2 border-[#1a5fb4] pb-1 mb-3 flex items-center gap-2">
@@ -304,7 +269,6 @@ function ModernTemplate({ data }: { data: CVData }) {
           </div>
         )}
 
-        {/* Languages */}
         {data.languages.length > 0 && data.languages[0].language && (
           <div>
             <h2 className="text-lg font-bold text-[#1a5fb4] border-b-2 border-[#1a5fb4] pb-1 mb-3 flex items-center gap-2">
@@ -331,7 +295,6 @@ function ModernTemplate({ data }: { data: CVData }) {
 function ClassicTemplate({ data }: { data: CVData }) {
   return (
     <div className="bg-white font-serif">
-      {/* Header */}
       <div className="border-b-2 border-gray-800 pb-6 p-8">
         <h1 className="text-3xl font-bold text-gray-900 mb-3">{data.personalInfo.fullName}</h1>
         <div className="flex flex-wrap gap-4 text-sm text-gray-600">
@@ -357,7 +320,6 @@ function ClassicTemplate({ data }: { data: CVData }) {
       </div>
 
       <div className="p-8">
-        {/* Summary */}
         {data.personalInfo.summary && (
           <div className="mb-6">
             <h2 className="text-lg font-bold text-gray-900 uppercase tracking-wide border-b border-gray-300 pb-1 mb-3">
@@ -367,7 +329,6 @@ function ClassicTemplate({ data }: { data: CVData }) {
           </div>
         )}
 
-        {/* Education */}
         {data.education.length > 0 && data.education[0].institution && (
           <div className="mb-6">
             <h2 className="text-lg font-bold text-gray-900 uppercase tracking-wide border-b border-gray-300 pb-1 mb-3">
@@ -377,17 +338,18 @@ function ClassicTemplate({ data }: { data: CVData }) {
               <div key={i} className="mb-3 flex justify-between">
                 <div>
                   <h3 className="font-bold text-gray-800">{edu.institution}</h3>
-                  <p className="text-sm text-gray-600">{edu.degree} - {edu.fieldOfStudy}</p>
+                  <p className="text-sm text-gray-600">
+                    {edu.degree} {edu.fieldOfStudy ? `- ${edu.fieldOfStudy}` : ""}
+                  </p>
                 </div>
-                <span className="text-xs text-gray-500">
-                  {edu.startDate} - {edu.endDate}
+                <span className="text-xs text-gray-500 shrink-0 mr-4">
+                  {edu.startDate} {edu.endDate ? `- ${edu.endDate}` : ""}
                 </span>
               </div>
             ))}
           </div>
         )}
 
-        {/* Experience */}
         {data.experience.length > 0 && data.experience[0].company && (
           <div className="mb-6">
             <h2 className="text-lg font-bold text-gray-900 uppercase tracking-wide border-b border-gray-300 pb-1 mb-3">
@@ -397,30 +359,26 @@ function ClassicTemplate({ data }: { data: CVData }) {
               <div key={i} className="mb-4">
                 <div className="flex items-center justify-between">
                   <h3 className="font-bold text-gray-800">{exp.position}</h3>
-                  <span className="text-xs text-gray-500">
-                    {exp.startDate} - {exp.endDate}
+                  <span className="text-xs text-gray-500 shrink-0 mr-4">
+                    {exp.startDate} {exp.endDate ? `- ${exp.endDate}` : ""}
                   </span>
                 </div>
                 <p className="text-sm text-gray-600 font-medium">{exp.company}</p>
-                <p className="text-sm text-gray-700 mt-1">{exp.description}</p>
+                {exp.description && <p className="text-sm text-gray-700 mt-1">{exp.description}</p>}
               </div>
             ))}
           </div>
         )}
 
-        {/* Skills */}
         {data.skills.length > 0 && data.skills[0] && (
           <div className="mb-6">
             <h2 className="text-lg font-bold text-gray-900 uppercase tracking-wide border-b border-gray-300 pb-1 mb-3">
               المهارات
             </h2>
-            <p className="text-sm text-gray-700">
-              {data.skills.filter(Boolean).join(" • ")}
-            </p>
+            <p className="text-sm text-gray-700">{data.skills.filter(Boolean).join(" • ")}</p>
           </div>
         )}
 
-        {/* Languages */}
         {data.languages.length > 0 && data.languages[0].language && (
           <div>
             <h2 className="text-lg font-bold text-gray-900 uppercase tracking-wide border-b border-gray-300 pb-1 mb-3">
@@ -457,7 +415,7 @@ function CreativeTemplate({ data }: { data: CVData }) {
             {data.personalInfo.email && (
               <div className="flex items-center gap-2">
                 <Mail className="w-3.5 h-3.5 shrink-0" />
-                {data.personalInfo.email}
+                <span className="break-all">{data.personalInfo.email}</span>
               </div>
             )}
             {data.personalInfo.phone && (
@@ -474,7 +432,6 @@ function CreativeTemplate({ data }: { data: CVData }) {
             )}
           </div>
 
-          {/* Skills */}
           {data.skills.length > 0 && data.skills[0] && (
             <div className="mb-8">
               <h2 className="text-lg font-bold mb-3 border-b border-white/30 pb-1">المهارات</h2>
@@ -490,7 +447,6 @@ function CreativeTemplate({ data }: { data: CVData }) {
             </div>
           )}
 
-          {/* Languages */}
           {data.languages.length > 0 && data.languages[0].language && (
             <div>
               <h2 className="text-lg font-bold mb-3 border-b border-white/30 pb-1">اللغات</h2>
@@ -508,7 +464,6 @@ function CreativeTemplate({ data }: { data: CVData }) {
 
         {/* Main Content */}
         <div className="w-2/3 p-6">
-          {/* Summary */}
           {data.personalInfo.summary && (
             <div className="mb-6">
               <h2 className="text-lg font-bold text-[#7c3aed] mb-3">نبذة شخصية</h2>
@@ -516,7 +471,6 @@ function CreativeTemplate({ data }: { data: CVData }) {
             </div>
           )}
 
-          {/* Education */}
           {data.education.length > 0 && data.education[0].institution && (
             <div className="mb-6">
               <h2 className="text-lg font-bold text-[#7c3aed] mb-3">التعليم</h2>
@@ -524,16 +478,17 @@ function CreativeTemplate({ data }: { data: CVData }) {
                 <div key={i} className="mb-3">
                   <div className="flex items-center justify-between">
                     <h3 className="font-bold text-gray-800">{edu.degree}</h3>
-                    <span className="text-xs text-gray-500">{edu.startDate} - {edu.endDate}</span>
+                    <span className="text-xs text-gray-500">
+                      {edu.startDate} {edu.endDate ? `- ${edu.endDate}` : ""}
+                    </span>
                   </div>
                   <p className="text-sm text-gray-600">{edu.institution}</p>
-                  <p className="text-xs text-gray-500">{edu.fieldOfStudy}</p>
+                  {edu.fieldOfStudy && <p className="text-xs text-gray-500">{edu.fieldOfStudy}</p>}
                 </div>
               ))}
             </div>
           )}
 
-          {/* Experience */}
           {data.experience.length > 0 && data.experience[0].company && (
             <div>
               <h2 className="text-lg font-bold text-[#7c3aed] mb-3">الخبرات العملية</h2>
@@ -541,10 +496,12 @@ function CreativeTemplate({ data }: { data: CVData }) {
                 <div key={i} className="mb-4">
                   <div className="flex items-center justify-between">
                     <h3 className="font-bold text-gray-800">{exp.position}</h3>
-                    <span className="text-xs text-gray-500">{exp.startDate} - {exp.endDate}</span>
+                    <span className="text-xs text-gray-500">
+                      {exp.startDate} {exp.endDate ? `- ${exp.endDate}` : ""}
+                    </span>
                   </div>
                   <p className="text-sm text-gray-600 font-medium">{exp.company}</p>
-                  <p className="text-sm text-gray-700 mt-1">{exp.description}</p>
+                  {exp.description && <p className="text-sm text-gray-700 mt-1">{exp.description}</p>}
                 </div>
               ))}
             </div>
