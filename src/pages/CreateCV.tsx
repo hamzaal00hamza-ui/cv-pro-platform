@@ -553,43 +553,44 @@ export default function CreateCV() {
                   اختر القالب
                 </h2>
 
-                <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-                  {CV_TEMPLATES.map((template) => (
-                    <div
-                      key={template.id}
-                      onClick={() => setData((prev) => ({ ...prev, template: template.id }))}
-                      className={`border-2 rounded-xl p-4 cursor-pointer transition-all hover:shadow-md ${
-                        data.template === template.id
-                          ? "border-[#1a5fb4] bg-[#1a5fb4]/5 shadow-md"
-                          : "border-border hover:border-[#1a5fb4]/50"
-                      }`}
-                    >
+                <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
+                  {CV_TEMPLATES.map((template) => {
+                    const colors: Record<string, string> = {
+                      modern: "from-[#1a5fb4] to-[#3b82f6]", classic: "from-[#374151] to-[#6b7280]",
+                      creative: "from-[#7c3aed] to-[#a78bfa]", elegant: "from-[#92400e] to-[#d97706]",
+                      minimal: "from-[#0f172a] to-[#334155]", tech: "from-[#065f46] to-[#10b981]",
+                      executive: "from-[#1e1b4b] to-[#4338ca]", medical: "from-[#0c4a6e] to-[#0284c7]",
+                      academic: "from-[#4a1942] to-[#be185d]", bold: "from-[#7f1d1d] to-[#ef4444]",
+                    };
+                    return (
                       <div
-                        className={`h-32 rounded-lg mb-3 flex items-center justify-center ${
-                          template.id === "modern"
-                            ? "bg-gradient-to-br from-[#1a5fb4] to-[#3b82f6]"
-                            : template.id === "classic"
-                            ? "bg-gradient-to-br from-[#374151] to-[#6b7280]"
-                            : "bg-gradient-to-br from-[#7c3aed] to-[#a78bfa]"
+                        key={template.id}
+                        onClick={() => setData((prev) => ({ ...prev, template: template.id }))}
+                        className={`border-2 rounded-xl p-3 cursor-pointer transition-all hover:shadow-md ${
+                          data.template === template.id
+                            ? "border-[#1a5fb4] bg-[#1a5fb4]/5 shadow-md"
+                            : "border-border hover:border-[#1a5fb4]/50"
                         }`}
                       >
-                        <div className="bg-white/20 backdrop-blur-sm rounded p-2 w-20 h-24 flex flex-col gap-1">
-                          <div className="w-full h-1.5 bg-white/60 rounded" />
-                          <div className="w-3/4 h-1 bg-white/40 rounded" />
-                          <div className="w-full h-0.5 bg-white/30 rounded mt-1" />
-                          <div className="w-full h-0.5 bg-white/30 rounded" />
-                          <div className="w-2/3 h-0.5 bg-white/30 rounded" />
+                        <div className={`h-24 rounded-lg mb-2 flex items-center justify-center bg-gradient-to-br ${colors[template.id] || "from-gray-400 to-gray-600"}`}>
+                          <div className="bg-white/20 backdrop-blur-sm rounded p-1.5 w-14 h-18 flex flex-col gap-1">
+                            <div className="w-full h-1.5 bg-white/60 rounded" />
+                            <div className="w-3/4 h-1 bg-white/40 rounded" />
+                            <div className="w-full h-0.5 bg-white/30 rounded mt-1" />
+                            <div className="w-full h-0.5 bg-white/30 rounded" />
+                            <div className="w-2/3 h-0.5 bg-white/30 rounded" />
+                          </div>
                         </div>
+                        <h3 className="font-bold text-center text-sm">{template.name}</h3>
+                        <p className="text-xs text-muted-foreground text-center mt-0.5 leading-snug">{template.description}</p>
+                        {data.template === template.id && (
+                          <div className="flex items-center justify-center mt-2">
+                            <CheckCircle className="w-4 h-4 text-[#1a5fb4]" />
+                          </div>
+                        )}
                       </div>
-                      <h3 className="font-bold text-center">{template.name}</h3>
-                      <p className="text-xs text-muted-foreground text-center mt-1">{template.description}</p>
-                      {data.template === template.id && (
-                        <div className="flex items-center justify-center mt-2">
-                          <CheckCircle className="w-5 h-5 text-[#1a5fb4]" />
-                        </div>
-                      )}
-                    </div>
-                  ))}
+                    );
+                  })}
                 </div>
               </div>
             )}
