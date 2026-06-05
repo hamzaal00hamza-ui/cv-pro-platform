@@ -21,21 +21,59 @@ app.use("/api/trpc/*", async (c) => {
 app.post("/api/verify-payment", async (c) => {
   try {
     const body = await c.req.json();
-    const { transaction_id, sender_phone, receiver_phone, amount } = body;
+    const { transaction_id, sender_phone, amount } = body;
 
-    const response = await fetch("https://apisyria.com/api/v1/syriatel-cash/verify", {
-      method: "POST",
+    const STORE_GSM = "0982493924";
+    const API_KEY = "a84b025e4b7e09ad38450aaa555ee83b0ae6ff8b17ec0d92e5a41e0f3ce39913";
+
+    // البحث عن العملية برقمها في حساب المتجر
+    const url = `https://apisyria.com/api/v1?resource=syriatel&action=find_tx&tx=${encodeURIComponent(transaction_id)}&gsm=${STORE_GSM}&period=7`;
+    const response = await fetch(url, {
+      method: "GET",
       headers: {
-        "Content-Type": "application/json",
-        "X-Api-Key": "a84b025e4b7e09ad38450aaa555ee83b0ae6ff8b17ec0d92e5a41e0f3ce39913",
+        "X-Api-Key": API_KEY,
+        "Accept": "application/json",
       },
-      body: JSON.stringify({ transaction_id, sender_phone, receiver_phone, amount }),
     });
 
-    const data = await response.json();
-    return c.json(data, response.ok ? 200 : 400);
+    const data: any = await response.json();
+
+    if (!response.ok || !data.success) {
+      return c.json({ success: false, message: data.error || "فشل الاتصال بالخدمة" }, 400);
+    }
+
+    // التحقق من وجود العملية
+    if (!data.data?.found) {
+      return c.json({ success: false, message: "رقم العملية غير موجود، تأكد من الرقم وحاول مجدداً" }, 400);
+    }
+
+    const tx = data.data.transaction;
+    const txAmount = parseInt(tx.amount);
+    const expectedAmount = parseInt(amount) || 5000;
+
+    // التحقق من المبلغ
+    if (txAmount < expectedAmount) {
+      return c.json({ success: false, message: `المبلغ غير كافٍ، تم استلام ${txAmount} ل.س بدلاً من ${expectedAmount} ل.س` }, 400);
+    }
+
+    // التحقق من رقم المرسل (اختياري — يتحقق إن أُرسل)
+    if (sender_phone && tx.from && !tx.from.includes(sender_phone.slice(-6))) {
+      return c.json({ success: false, message: "رقم الهاتف المُرسل لا يطابق العملية" }, 400);
+    }
+
+    return c.json({
+      success: true,
+      message: "تم التحقق من الدفع بنجاح",
+      transaction: {
+        no: tx.transaction_no,
+        amount: tx.amount,
+        date: tx.date,
+        from: tx.from,
+      }
+    });
+
   } catch (err: any) {
-    return c.json({ success: false, message: "فشل الاتصال بخدمة التحقق" }, 500);
+    return c.json({ success: false, message: "تعذر الاتصال بخدمة التحقق" }, 500);
   }
 });
 
