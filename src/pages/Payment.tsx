@@ -249,7 +249,7 @@ export default function Payment() {
               <div className="bg-white rounded-xl p-6 shadow-sm border border-border">
                 <h2 className="text-lg font-bold mb-4 flex items-center gap-2">
                   <CreditCard className="w-5 h-5 text-[#1a5fb4]" />
-                  تأكيد عملية الدفع
+                  تأكيد عملية الدفع <span className="text-xs bg-green-500 text-white px-2 py-0.5 rounded-full">نسخة 2</span>
                 </h2>
 
                 {/* خطأ التحقق */}
